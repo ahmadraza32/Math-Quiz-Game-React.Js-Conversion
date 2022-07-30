@@ -1,104 +1,113 @@
-import React, { useEffect, useRef, useState } from 'react'
-import Todolist from './component/Todolist'
+import React from 'react'
+import { useRef } from 'react'
+import { useEffect } from 'react'
+import { useState } from 'react'
 import './App.css'
-import axios from 'axios'
 
-export default function App() {
-  const [flashcards, setFlashcards] = useState([])
-  const [categories, setCategories] = useState([])
+function App() {
+  const [score, setscore] = useState(0)
+  const [mistakes, setmistakes] = useState(0)
+  const [currentProblem, setCurrentProblem] = useState(generateProblem())
+  const [inputValue, setInputValue] = useState('')
+  const [showError, setShowError] = useState(false)
 
-  const selectEl = useRef()
-  const amountEl = useRef()
+  const inputRef = useRef()
+  const btnRef = useRef(null)
 
   useEffect(() => {
-    axios.get(`https://opentdb.com/api_category.php`)
-    .then(res => {
-      setCategories(res.data.trivia_categories)
-    })
+    if(score === 10 || mistakes === 3)
+      btnRef.current.focus()
+  }, [mistakes, score])
+
+  useEffect(() => {
+    inputRef.current.focus()
   }, [])
-  
 
-  function decodeString(str){
-    const textarea = document.createElement('textarea')
-    textarea.innerHTML = str
-    return textarea.value
+  function generateNum(num){
+    return Math.floor(Math.random() * num + 1)
   }
 
-  function handleSub(e){
-    e.preventDefault()
-
-    axios.get(`https://opentdb.com/api.php`, 
-      {
-        params: {
-          amount: amountEl.current.value,
-          category: selectEl.current.value
-        }
+  function generateProblem(){
+      return {
+          numberOne: generateNum(10),
+          numberTwo: generateNum(10),
+          operator: ['-', '+', 'x'][generateNum(2)]
       }
-    )
-    .then(res => {
-      setFlashcards(res.data.results.map((questionItem, index) => {
-        const answer = decodeString(questionItem.correct_answer)
-        const options = [...questionItem.incorrect_answers.map(a => decodeString(a)), answer]
-        return {
-          id: `${index}-${Date.now()}`,
-          question: decodeString(questionItem.question),
-          answer: questionItem.correct_answer,
-          options: options.sort(() => Math.random() - .5)
-        }
-      }))
-    })
   }
 
+  function handleSubmit(e){
+    e.preventDefault()
+    let correctAnswer
+
+    if(currentProblem.operator == '+') correctAnswer = currentProblem.numberOne + currentProblem.numberTwo
+    if(currentProblem.operator == '-') correctAnswer = currentProblem.numberOne - currentProblem.numberTwo
+    if(currentProblem.operator == 'x') correctAnswer = currentProblem.numberOne * currentProblem.numberTwo
+
+    if(parseInt(inputValue) === correctAnswer){
+      setscore(prev => prev + 1)
+      setCurrentProblem(generateProblem())
+      setInputValue('')
+      inputRef.current.focus()
+    }
+    else{
+      setmistakes(prev => prev + 1)
+      setInputValue('')
+      inputRef.current.focus()
+      setShowError(true)
+      setTimeout(() => setShowError(false), 460)
+    }
+  }
+
+  function resetGame(){
+    setmistakes(0)
+    setscore(0)
+    setInputValue('')
+    setCurrentProblem(generateProblem())
+  }
 
   return (
-    <div>
-      <form  className="header" onSubmit={handleSub}>
-        <div className="form-group">
-          <label htmlFor="category">Category</label>
-          <select name="" id="category" ref={selectEl}>
-            {
-              categories.map(category => {
-                return <option value={category.id} key={category.id}>
-                  {category.name}
-                </option>
-              })
-            }
-          </select>
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="amount">Number of Question</label>
-          <input type="number" name="" id="amount" min="1" step="1" defaultValue={10} ref={amountEl} />
-        </div>
+    <>
+      
+    <div className={ ( mistakes === 3 || score === 10 ? 'is-overlay-open ' : '' ) + " main-ui " }>
+        <h1 className={"problem " + (showError && 'animate-text-wrong')}>{currentProblem.numberOne } {currentProblem.operator} { currentProblem.numberTwo} </h1>
+        <form className="our-form" onSubmit={handleSubmit}>
+            <input type="text" ref={inputRef} autoComplete="off" className="our-field" value={inputValue} onChange={e => setInputValue(e.target.value)} />
+            <button>Submit</button>
 
-        <div className="form-group">
-          <button>Generate</button>
-        </div>
+        </form>
+        <p>You need <span className="points-needed">{10 - score} </span> more points & can make <span className="mistakes">{2 - mistakes} </span> mistakes.</p>
 
-      </form>
+        <ProgressBar score={score}/>
 
-      <div className='container'>
-        <Todolist flashcards={flashcards} />
-      </div>
     </div>
+
+    <div className={ ( mistakes === 3 || score === 10 ? 'is-overlay-open ' : '' ) + " overlay" }>
+        <div className="overlay-inner"></div>
+        <p className="msg-overlay">{score === 10 ? 'Congrats You won' : 'Sorry you lost'} </p>
+        <button onClick={resetGame} className="overlay-btn" ref={btnRef}>Start over</button>
+    </div>
+    </>
   )
 }
 
-const sampleCard = [
-  {
-    id: 1,
-    question: 'what is 2+2?',
-    answer: '4',
-    options: [
-      '2', '5','4','6'
-    ]
-  },
-  {
-    id: 1,
-    question: 'what is 2+3?',
-    answer: '5',
-    options: [
-      '2', '5','4','6'
-    ]
-  }
-]
+function ProgressBar(props){
+  return(
+    <div className="progress">
+      <div className="boxes">
+          <div className="box"></div>
+          <div className="box"></div>
+          <div className="box"></div>
+          <div className="box"></div>
+          <div className="box"></div>
+          <div className="box"></div>
+          <div className="box"></div>
+          <div className="box"></div>
+          <div className="box"></div>
+          <div className="box"></div>
+      </div>
+      <div className="progress-inner" style={{ transform: `scaleX(${props.score/10})` }}></div>
+  </div>
+  )
+}
+
+export default App
